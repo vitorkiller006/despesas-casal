@@ -4,9 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Despesas do Casal</title>
-    <script>
-        alert("TESTE: O HTML novo carregou!");
-    </script>
     
     <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -98,11 +95,12 @@
                                     <th>Descrição</th>
                                     <th>Categoria</th>
                                     <th>Valor</th>
+                                    <th style="width: 50px;"></th>
                                 </tr>
                             </thead>
                             <tbody id="expenses-tbody">
                                 <!-- Preenchido dinamicamente via JS -->
-                                <tr><td colspan="4" class="loading-td">Aguardando conexão com Supabase...</td></tr>
+                                <tr><td colspan="5" class="loading-td">Aguardando conexão com Supabase...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -165,9 +163,6 @@
     <div id="toast" class="toast">Despesa salva com sucesso!</div>
 
     <script>
-        document.body.style.border = "10px solid red";
-    </script>
-    <script>
         // O código javascript agora fica direto no HTML para evitar 100% os problemas de cache
         window.onerror = function(msg, url, lineNo, columnNo, error) {
             alert("Erro JS Crítico: " + msg + " na linha " + lineNo);
@@ -225,10 +220,10 @@
         async function carregarDespesas() {
             const tbody = document.getElementById('expenses-tbody');
             if (!supabaseClient) {
-                tbody.innerHTML = '<tr><td colspan="4" class="loading-td">Sistema Offline. Verifique sua conexão.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="loading-td">Sistema Offline. Verifique sua conexão.</td></tr>';
                 return;
             }
-            tbody.innerHTML = '<tr><td colspan="4" class="loading-td">Sincronizando despesas...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="loading-td">Sincronizando despesas...</td></tr>';
 
             try {
                 const { data: despesas, error } = await supabaseClient
@@ -242,7 +237,7 @@
                 let html = '';
 
                 if (!despesas || despesas.length === 0) {
-                    html = '<tr><td colspan="4" class="loading-td">Nenhuma despesa lançada ainda!</td></tr>';
+                    html = '<tr><td colspan="5" class="loading-td">Nenhuma despesa lançada ainda!</td></tr>';
                     document.getElementById('total-gasto').innerText = 'R$ 0,00';
                     document.getElementById('total-lancamentos').innerText = '0';
                     document.getElementById('ultima-data').innerText = '--/--/----';
@@ -255,6 +250,11 @@
                                 <td>${d.descricao}</td>
                                 <td><span style="background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 6px; font-size: 0.8rem;">${d.categoria}</span></td>
                                 <td class="val-negative">${formatter.format(d.valor)}</td>
+                                <td>
+                                    <button onclick="deletarDespesa(${d.id})" style="background: transparent; border: none; color: var(--accent-red); cursor: pointer; font-size: 1.1rem; padding: 5px;">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </td>
                             </tr>
                         `;
                     });
@@ -264,7 +264,7 @@
                 }
                 tbody.innerHTML = html;
             } catch (err) {
-                tbody.innerHTML = '<tr><td colspan="4" class="loading-td" style="color: red">Falha ao baixar dados.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="loading-td" style="color: red">Falha ao baixar dados.</td></tr>';
                 alert("Falha na sincronização: " + err.message);
             }
         }
@@ -300,18 +300,21 @@
             }
         });
 
+        window.deletarDespesa = async function(id) {
+            if (!confirm("Tem certeza que quer apagar essa despesa?")) return;
+
+            try {
+                const { error } = await supabaseClient.from('despesas').delete().match({ id: id });
+                if (error) throw error;
+                
+                carregarDespesas(); // Atualiza a tela depois de apagar
+            } catch (err) {
+                alert("Erro ao excluir: " + err.message);
+            }
+        };
+
         // Força a chamada imediata independente do DOMContentLoaded
         carregarDespesas();
-    </script>
-    <script>
-        if (typeof carregarDespesas === 'undefined') {
-            document.body.style.border = "10px solid red";
-            document.getElementById('toast').innerText = "ERRO: O SCRIPT QUEBROU!";
-        } else {
-            document.body.style.border = "10px solid green";
-            document.getElementById('toast').innerText = "Script carregado com sucesso!";
-            mostrarToast();
-        }
     </script>
 </body>
 </html>
