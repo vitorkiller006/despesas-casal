@@ -144,48 +144,6 @@ document.getElementById('expense-form').addEventListener('submit', async (e) => 
     }
 });
 
-function initApp() {
-    let isLoggedIn = false;
-    try {
-        isLoggedIn = localStorage.getItem('despesas_auth') === 'true';
-    } catch(e) {}
-    
-    if (isLoggedIn) {
-        document.getElementById('login-container').style.display = 'none';
-        document.getElementById('app-container').style.display = 'flex';
-        carregarDespesas();
-    } else {
-        document.getElementById('login-container').style.display = 'flex';
-        document.getElementById('app-container').style.display = 'none';
-    }
-}
-
-document.getElementById('login-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    try {
-        const user = document.getElementById('login-user').value.trim().toLowerCase();
-        const pass = document.getElementById('login-pass').value.trim();
-        const erroDiv = document.getElementById('login-error');
-
-        // Aceita qualquer erro de digitação no usuário desde que contenha 'vitor' ou se ele usar a nova/velha senha
-        if ((user === 'vitor' || user.includes('vitor')) && 
-            (pass === '@19216801Gg' || pass === '@19216801GgJlsp2000#')) {
-            
-            try {
-                localStorage.setItem('despesas_auth', 'true');
-            } catch(ex) { /* Ignora erro de localStorage */ }
-            
-            erroDiv.style.display = 'none';
-            initApp();
-        } else {
-            erroDiv.style.display = 'block';
-            erroDiv.innerText = "Usuário ou senha incorretos!";
-        }
-    } catch (err) {
-        alert("Erro no script de login: " + err.message);
-    }
-});
-
 document.addEventListener('DOMContentLoaded', () => {
-    initApp();
+    carregarDespesas();
 });

@@ -399,20 +399,3 @@ input:focus, select:focus {
     bottom: 40px;
 }
 
-/* ---------------- LOGIN ---------------- */
-.login-container {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    width: 100vw;
-    background: linear-gradient(135deg, var(--bg-color), #000);
-}
-
-.login-box {
-    width: 100%;
-    max-width: 400px;
-    margin: 20px;
-    border-top: 4px solid var(--accent-blue);
-    animation: fadeIn 0.5s ease;
-}

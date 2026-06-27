@@ -17,33 +17,10 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- Nosso CSS e JS -->
-    <link rel="stylesheet" href="style.css?v=3">
+    <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
-    <!-- TELA DE LOGIN -->
-    <div class="login-container" id="login-container">
-        <div class="card login-box">
-            <h2><i class="fa-solid fa-lock" style="color: var(--accent-blue);"></i> Acesso</h2>
-            <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 0.9rem;">Insira suas credenciais para acessar as despesas do casal.</p>
-            
-            <form id="login-form">
-                <div class="form-group">
-                    <label for="login-user">Usuário</label>
-                    <input type="text" id="login-user" required placeholder="Digite o usuário">
-                </div>
-                <div class="form-group" style="margin-top: 16px;">
-                    <label for="login-pass">Senha</label>
-                    <input type="password" id="login-pass" required placeholder="Digite a senha">
-                </div>
-                <div id="login-error" style="color: var(--accent-red); font-size: 0.85rem; margin-top: 12px; display: none;">
-                    Usuário ou senha incorretos!
-                </div>
-                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 24px;">Entrar</button>
-            </form>
-        </div>
-    </div>
-
-    <div class="app-container" id="app-container" style="display: none;">
+    <div class="app-container" id="app-container">
         
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
@@ -184,6 +161,6 @@
     <!-- Notification Toast -->
     <div id="toast" class="toast">Despesa salva com sucesso!</div>
 
-    <script src="app.js?v=6"></script>
+    <script src="app.js?v=7"></script>
 </body>
 </html>
