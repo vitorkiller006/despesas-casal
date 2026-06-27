@@ -492,6 +492,9 @@
                                 <td><span style="background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 6px; font-size: 0.8rem;">${d.categoria}</span></td>
                                 <td class="val-negative">${formatter.format(d.valor)}</td>
                                 <td>
+                                    <button onclick="editarDespesa('${d.id}')" style="background: transparent; border: none; color: var(--accent-blue); cursor: pointer; font-size: 1.1rem; padding: 5px; margin-right: 5px;">
+                                        <i class="fa-solid fa-pen-to-square"></i>
+                                    </button>
                                     <button onclick="deletarDespesa('${d.id}')" style="background: transparent; border: none; color: var(--accent-red); cursor: pointer; font-size: 1.1rem; padding: 5px;">
                                         <i class="fa-solid fa-trash-can"></i>
                                     </button>
@@ -507,12 +510,33 @@
             }
         }
 
+        let cartoesCadastrados = [];
+        let editandoDespesaId = null;
+
+        document.getElementById('forma_pagamento').addEventListener('change', (e) => {
+            const bancoSelect = document.getElementById('banco');
+            if (e.target.value.includes('Cartão')) {
+                if (cartoesCadastrados.length > 0) {
+                    bancoSelect.innerHTML = cartoesCadastrados.map(c => `<option value="${c.nome}">${c.nome} (${c.banco})</option>`).join('');
+                } else {
+                    bancoSelect.innerHTML = '<option value="" disabled selected>Nenhum cartão cadastrado</option>';
+                }
+            } else {
+                bancoSelect.innerHTML = `
+                    <option value="Nubank">Nubank</option>
+                    <option value="Banco do Brasil">Banco do Brasil</option>
+                    <option value="Itaú">Itaú</option>
+                    <option value="Caixa">Caixa Econômica</option>
+                    <option value="Inter">Inter</option>
+                    <option value="Santander">Santander</option>
+                    <option value="Outro">Outro</option>
+                `;
+            }
+        });
+
         document.getElementById('expense-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            if (!supabaseClient) {
-                alert("Sistema offline!");
-                return;
-            }
+            if (!supabaseClient) return;
 
             const descricao = document.getElementById('descricao').value;
             const valorTotal = parseFloat(document.getElementById('valor').value);
@@ -523,41 +547,45 @@
             const parcelas = parseInt(document.getElementById('parcelas').value);
 
             const btnSubmit = document.getElementById('btn-submit');
-            
             btnSubmit.innerHTML = 'Processando...';
             btnSubmit.disabled = true;
 
             try {
-                const inserts = [];
-                const valorParcela = valorTotal / parcelas;
-                const dataBase = new Date(dataStr + 'T12:00:00');
+                if (editandoDespesaId) {
+                    // Modo de edição: atualiza apenas uma despesa (ignora criação de múltiplas parcelas novas)
+                    const { error } = await supabaseClient.from('despesas').update({
+                        descricao, valor: valorTotal, categoria, data: dataStr, banco, forma_pagamento
+                    }).match({ id: editandoDespesaId });
+                    
+                    if (error) throw error;
+                    editandoDespesaId = null; // reseta
+                } else {
+                    // Modo de criação: cria múltiplas se tiver parcelas
+                    const inserts = [];
+                    const valorParcela = valorTotal / parcelas;
+                    const dataBase = new Date(dataStr + 'T12:00:00');
 
-                for (let i = 0; i < parcelas; i++) {
-                    let desc = parcelas > 1 ? `${descricao} (Parc. ${i+1}/${parcelas})` : descricao;
-                    
-                    let novaData = new Date(dataBase);
-                    novaData.setMonth(novaData.getMonth() + i);
-                    
-                    let y = novaData.getFullYear();
-                    let m = String(novaData.getMonth() + 1).padStart(2, '0');
-                    let d = String(novaData.getDate()).padStart(2, '0');
-                    
-                    inserts.push({
-                        descricao: desc,
-                        valor: valorParcela,
-                        categoria: categoria,
-                        data: `${y}-${m}-${d}`,
-                        banco: banco,
-                        forma_pagamento: forma_pagamento,
-                        parcelas: String(parcelas),
-                        num_parcela: String(i+1)
-                    });
+                    for (let i = 0; i < parcelas; i++) {
+                        let desc = parcelas > 1 ? `${descricao} (Parc. ${i+1}/${parcelas})` : descricao;
+                        let novaData = new Date(dataBase);
+                        novaData.setMonth(novaData.getMonth() + i);
+                        let y = novaData.getFullYear();
+                        let m = String(novaData.getMonth() + 1).padStart(2, '0');
+                        let d = String(novaData.getDate()).padStart(2, '0');
+                        
+                        inserts.push({
+                            descricao: desc, valor: valorParcela, categoria: categoria, data: `${y}-${m}-${d}`,
+                            banco: banco, forma_pagamento: forma_pagamento, parcelas: String(parcelas), num_parcela: String(i+1)
+                        });
+                    }
+                    const { error } = await supabaseClient.from('despesas').insert(inserts);
+                    if (error) throw error;
                 }
 
-                const { error } = await supabaseClient.from('despesas').insert(inserts);
-                if (error) throw error;
-
                 document.getElementById('expense-form').reset();
+                // Reseta a lista de bancos para o padrão
+                document.getElementById('forma_pagamento').dispatchEvent(new Event('change'));
+                
                 mostrarToast();
                 switchView('view-dashboard', document.getElementById('nav-dashboard'));
             } catch (err) {
@@ -567,6 +595,30 @@
                 btnSubmit.disabled = false;
             }
         });
+
+        window.editarDespesa = async function(id) {
+            // Busca os dados atuais
+            const { data } = await supabaseClient.from('despesas').select('*').eq('id', id).single();
+            if (!data) return;
+
+            editandoDespesaId = id;
+            document.getElementById('descricao').value = data.descricao;
+            document.getElementById('valor').value = data.valor;
+            document.getElementById('categoria').value = data.categoria;
+            document.getElementById('data').value = data.data;
+            document.getElementById('forma_pagamento').value = data.forma_pagamento;
+            
+            // Força a atualização da lista de bancos se for cartão
+            document.getElementById('forma_pagamento').dispatchEvent(new Event('change'));
+            
+            setTimeout(() => { document.getElementById('banco').value = data.banco; }, 100);
+            
+            document.getElementById('parcelas').value = 1; // Editar não repassa parcelas
+            document.getElementById('parcelas').disabled = true; // Desabilita mudar parcelas na edição
+            
+            document.getElementById('btn-submit').innerHTML = '<i class="fa-solid fa-pen"></i> Atualizar Despesa';
+            switchView('view-add', document.getElementById('nav-add'));
+        };
 
         window.deletarDespesa = async function(id) {
             if (!confirm("Tem certeza que quer apagar essa despesa? Se for parcelada, apenas essa parcela será apagada.")) return;
@@ -642,6 +694,8 @@
         // ==========================================
         // CARTÕES DE CRÉDITO
         // ==========================================
+        let editandoCartaoId = null;
+
         async function carregarCartoes() {
             const container = document.getElementById('cartoes-container');
             if(!supabaseClient) return;
@@ -649,6 +703,8 @@
             try {
                 const { data: cartoes, error } = await supabaseClient.from('cartoes').select('*');
                 if (error) throw error;
+                cartoesCadastrados = cartoes || []; // Atualiza o cache global
+                
                 if (!cartoes || cartoes.length === 0) {
                     container.innerHTML = '<p style="color:var(--text-secondary)">Nenhum cartão cadastrado.</p>';
                 } else {
@@ -658,7 +714,10 @@
                         let textColor = c.banco === 'Banco do Brasil' ? '#000' : '#fff';
                         html += `
                             <div class="card" style="background: ${cor}; color: ${textColor}; position: relative;">
-                                <button onclick="deletarCartao('${c.id}')" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.2); border: none; color: ${textColor}; padding: 5px; border-radius: 5px; cursor: pointer;"><i class="fa-solid fa-trash"></i></button>
+                                <div style="position: absolute; top: 10px; right: 10px; display: flex; gap: 5px;">
+                                    <button onclick="editarCartao('${c.id}')" style="background: rgba(0,0,0,0.2); border: none; color: ${textColor}; padding: 5px; border-radius: 5px; cursor: pointer;"><i class="fa-solid fa-pen"></i></button>
+                                    <button onclick="deletarCartao('${c.id}')" style="background: rgba(0,0,0,0.2); border: none; color: ${textColor}; padding: 5px; border-radius: 5px; cursor: pointer;"><i class="fa-solid fa-trash"></i></button>
+                                </div>
                                 <h3><i class="fa-solid fa-credit-card"></i> ${c.nome}</h3>
                                 <p style="margin-top: 5px; opacity: 0.8; font-size: 0.9rem;">${c.banco}</p>
                                 <div style="margin-top: 15px; display: flex; justify-content: space-between;">
@@ -681,6 +740,23 @@
             } catch (err) {}
         };
 
+        window.editarCartao = async function(id) {
+            const { data } = await supabaseClient.from('cartoes').select('*').eq('id', id).single();
+            if (!data) return;
+
+            editandoCartaoId = id;
+            document.getElementById('car-banco').value = data.banco;
+            document.getElementById('car-nome').value = data.nome;
+            document.getElementById('car-vencimento').value = data.dia_vencimento;
+            document.getElementById('car-limite').value = data.limite || '';
+            
+            const btn = document.getElementById('btn-submit-car');
+            btn.innerHTML = '<i class="fa-solid fa-pen"></i> Atualizar Cartão';
+            
+            // Rola pro topo suavemente
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
         document.getElementById('cartao-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('btn-submit-car');
@@ -691,8 +767,16 @@
                 const dia_vencimento = parseInt(document.getElementById('car-vencimento').value);
                 const limiteStr = document.getElementById('car-limite').value;
                 const limite = limiteStr ? parseFloat(limiteStr) : null;
-                await supabaseClient.from('cartoes').insert([{ banco, nome, dia_vencimento, limite }]);
+                
+                if (editandoCartaoId) {
+                    await supabaseClient.from('cartoes').update({ banco, nome, dia_vencimento, limite }).match({ id: editandoCartaoId });
+                    editandoCartaoId = null;
+                } else {
+                    await supabaseClient.from('cartoes').insert([{ banco, nome, dia_vencimento, limite }]);
+                }
+                
                 document.getElementById('cartao-form').reset();
+                btn.innerHTML = '<i class="fa-solid fa-plus"></i> Adicionar Cartão';
                 mostrarToast();
                 carregarCartoes();
             } catch (err) { alert(err.message); } finally { btn.disabled = false; }
@@ -769,6 +853,7 @@
 
         // Força a chamada imediata na aba inicial
         carregarDashboard();
+        carregarCartoes(); // Popula silenciosamente os cartoes globais para o formulário de despesas
     </script>
 </body>
 </html>
