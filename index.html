@@ -55,9 +55,15 @@
             </header>
 
             <!-- DASHBOARD VIEW -->
-            <section id="view-dashboard" class="view-section active">
-                <div class="header">
-                    <h2>Dashboard</h2>
+            <div id="view-dashboard" class="view-section active">
+            <h2 style="margin-bottom: 20px;"><i class="fa-solid fa-chart-pie"></i> Visão Geral</h2>
+
+            <div style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px; background: var(--card-bg); padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px var(--shadow-color);">
+                <label for="mes-filtro" style="margin: 0; font-weight: bold; color: var(--text-primary);"><i class="fa-regular fa-calendar"></i> Referência:</label>
+                <input type="month" id="mes-filtro" style="flex: 1; margin: 0; background: var(--bg-color); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px; font-family: inherit;">
+            </div>
+
+            <div class="dashboard-grid">
                     <p style="color: var(--text-secondary)">Resumo do mês atual</p>
                 </div>
 
@@ -123,7 +129,7 @@
                         </table>
                     </div>
                 </div>
-            </section>
+            </div>
 
             <!-- ADD EXPENSE VIEW -->
             <section id="view-add" class="view-section">
@@ -297,10 +303,14 @@
                         </div>
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="car-vencimento">Dia do Vencimento</label>
+                                <label for="car-vencimento">Dia de Vencimento</label>
                                 <input type="number" id="car-vencimento" min="1" max="31" required>
                             </div>
                             <div class="form-group">
+                                <label for="car-fechamento">Dia de Fechamento</label>
+                                <input type="number" id="car-fechamento" min="1" max="31">
+                            </div>
+                        </div>    <div class="form-group">
                                 <label for="car-limite">Limite (Opcional R$)</label>
                                 <input type="number" id="car-limite" step="0.01">
                             </div>
@@ -435,9 +445,14 @@
         async function carregarDashboard() {
             if (!supabaseClient) return;
             try {
-                const hoje = new Date();
-                const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
-                const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().split('T')[0];
+                const filtroVal = document.getElementById('mes-filtro').value; // YYYY-MM
+                if (!filtroVal) return;
+                const [anoStr, mesStr] = filtroVal.split('-');
+                const ano = parseInt(anoStr);
+                const mes = parseInt(mesStr) - 1;
+
+                const primeiroDia = new Date(ano, mes, 1).toISOString().split('T')[0];
+                const ultimoDia = new Date(ano, mes + 1, 0).toISOString().split('T')[0];
 
                 const { data: despMes } = await supabaseClient.from('despesas').select('valor').gte('data', primeiroDia).lte('data', ultimoDia);
                 const { data: recMes } = await supabaseClient.from('receitas').select('valor').gte('data', primeiroDia).lte('data', ultimoDia);
@@ -469,12 +484,20 @@
             tbody.innerHTML = '<tr><td colspan="5" class="loading-td">Sincronizando despesas...</td></tr>';
 
             try {
-                // Para o Dashboard a gente puxa as últimas 50
+                const filtroVal = document.getElementById('mes-filtro').value;
+                const [anoStr, mesStr] = filtroVal.split('-');
+                const ano = parseInt(anoStr);
+                const mes = parseInt(mesStr) - 1;
+
+                const primeiroDia = new Date(ano, mes, 1).toISOString().split('T')[0];
+                const ultimoDia = new Date(ano, mes + 1, 0).toISOString().split('T')[0];
+
                 const { data: despesas, error } = await supabaseClient
                     .from('despesas')
                     .select('*')
-                    .order('data', { ascending: false })
-                    .limit(50);
+                    .gte('data', primeiroDia)
+                    .lte('data', ultimoDia)
+                    .order('data', { ascending: false });
 
                 if (error) throw error;
 
@@ -739,8 +762,9 @@
                                 </div>
                                 <h3><i class="fa-solid fa-credit-card"></i> ${c.nome}</h3>
                                 <p style="margin-top: 5px; opacity: 0.8; font-size: 0.9rem;">${c.banco}</p>
-                                <div style="margin-top: 15px; display: flex; justify-content: space-between;">
-                                    <div><span style="font-size: 0.8rem; opacity: 0.8;">Vencimento</span><br><strong>Dia ${c.dia_vencimento}</strong></div>
+                                <div style="margin-top: 15px; display: flex; justify-content: space-between; gap: 10px;">
+                                    <div><span style="font-size: 0.8rem; opacity: 0.8;">Fechamento</span><br><strong>${c.dia_fechamento ? 'Dia ' + c.dia_fechamento : '--'}</strong></div>
+                                    <div style="text-align: center;"><span style="font-size: 0.8rem; opacity: 0.8;">Vencimento</span><br><strong>Dia ${c.dia_vencimento}</strong></div>
                                     <div style="text-align: right;"><span style="font-size: 0.8rem; opacity: 0.8;">Limite</span><br><strong>${c.limite ? formatter.format(c.limite) : 'Não inf.'}</strong></div>
                                 </div>
                             </div>
@@ -767,6 +791,7 @@
             document.getElementById('car-banco').value = data.banco;
             document.getElementById('car-nome').value = data.nome;
             document.getElementById('car-vencimento').value = data.dia_vencimento;
+            document.getElementById('car-fechamento').value = data.dia_fechamento || '';
             document.getElementById('car-limite').value = data.limite || '';
             
             const btn = document.getElementById('btn-submit-car');
@@ -784,14 +809,16 @@
                 const banco = document.getElementById('car-banco').value;
                 const nome = document.getElementById('car-nome').value;
                 const dia_vencimento = parseInt(document.getElementById('car-vencimento').value);
+                const dia_fechamento_str = document.getElementById('car-fechamento').value;
+                const dia_fechamento = dia_fechamento_str ? parseInt(dia_fechamento_str) : null;
                 const limiteStr = document.getElementById('car-limite').value;
                 const limite = limiteStr ? parseFloat(limiteStr) : null;
                 
                 if (editandoCartaoId) {
-                    await supabaseClient.from('cartoes').update({ banco, nome, dia_vencimento, limite }).match({ id: editandoCartaoId });
+                    await supabaseClient.from('cartoes').update({ banco, nome, dia_vencimento, dia_fechamento, limite }).match({ id: editandoCartaoId });
                     editandoCartaoId = null;
                 } else {
-                    await supabaseClient.from('cartoes').insert([{ banco, nome, dia_vencimento, limite }]);
+                    await supabaseClient.from('cartoes').insert([{ banco, nome, dia_vencimento, dia_fechamento, limite }]);
                 }
                 
                 document.getElementById('cartao-form').reset();
@@ -869,6 +896,11 @@
                 carregarReservas();
             } catch (err) { alert(err.message); } finally { btn.disabled = false; }
         });
+
+        // Initialize Dashboard Filter to current month
+        const hojeFilter = new Date();
+        document.getElementById('mes-filtro').value = `${hojeFilter.getFullYear()}-${String(hojeFilter.getMonth() + 1).padStart(2, '0')}`;
+        document.getElementById('mes-filtro').addEventListener('change', carregarDashboard);
 
         // Força a chamada imediata na aba inicial
         carregarDashboard();
