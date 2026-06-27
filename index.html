@@ -165,6 +165,9 @@
     <div id="toast" class="toast">Despesa salva com sucesso!</div>
 
     <script>
+        document.body.style.border = "10px solid red";
+    </script>
+    <script>
         // O código javascript agora fica direto no HTML para evitar 100% os problemas de cache
         window.onerror = function(msg, url, lineNo, columnNo, error) {
             alert("Erro JS Crítico: " + msg + " na linha " + lineNo);
@@ -299,6 +302,16 @@
 
         // Força a chamada imediata independente do DOMContentLoaded
         carregarDespesas();
+    </script>
+    <script>
+        if (typeof carregarDespesas === 'undefined') {
+            document.body.style.border = "10px solid red";
+            document.getElementById('toast').innerText = "ERRO: O SCRIPT QUEBROU!";
+        } else {
+            document.body.style.border = "10px solid green";
+            document.getElementById('toast').innerText = "Script carregado com sucesso!";
+            mostrarToast();
+        }
     </script>
 </body>
 </html>
