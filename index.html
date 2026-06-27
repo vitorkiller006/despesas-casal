@@ -11,12 +11,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- FontAwesome for Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Supabase JS Client -->
+    <title>Despesas Casal - Dashboard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-    <!-- Nosso CSS e JS -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>!-- Nosso CSS e JS -->
     <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
@@ -102,6 +101,20 @@
                             </div>
                         </div>
 
+                    </div>
+                </div>
+                <div class="dashboard-grid" style="margin-top: 20px;">
+                    <div class="card" style="grid-column: span 1;">
+                        <h3>Despesas por Categoria</h3>
+                        <div style="position: relative; height: 250px; margin-top: 15px;">
+                            <canvas id="gastosChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="card" style="grid-column: span 1;">
+                        <h3>Balanço do Mês</h3>
+                        <div style="position: relative; height: 250px; margin-top: 15px;">
+                            <canvas id="balancoChart"></canvas>
+                        </div>
                     </div>
                 </div>
 
@@ -255,6 +268,12 @@
                                 <input type="date" id="rec-data" required>
                             </div>
                         </div>
+                        <div class="form-row">
+                            <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 10px;">
+                                <input type="checkbox" id="rec-fixa" style="width: 20px; height: 20px; cursor: pointer;">
+                                <label for="rec-fixa" style="margin: 0; cursor: pointer;">Ganho Fixo (Repetir nos próximos 12 meses)</label>
+                            </div>
+                        </div>
                         <div class="form-actions" style="justify-content: flex-end;">
                             <button type="submit" class="btn btn-primary" id="btn-submit-rec" style="background: var(--accent-green);">
                                 <i class="fa-solid fa-check"></i> Salvar Ganho
@@ -376,8 +395,13 @@
                 </div>
                 
                 <h3 style="margin: 20px 0 10px 0;">Nossas Reservas</h3>
-                <div id="reservas-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+                <div id="reservas-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-bottom: 30px;">
                     <!-- Reservas Aqui -->
+                </div>
+
+                <div class="card" style="margin-top: 20px;">
+                    <h3>Evolução Patrimonial</h3>
+                    <canvas id="reservasChart" style="max-height: 300px; margin-top: 15px;"></canvas>
                 </div>
             </section>
 
@@ -450,6 +474,11 @@
             }
         }
 
+        // Variáveis globais dos gráficos
+        let gastosChartInstance = null;
+        let balancoChartInstance = null;
+        let reservasChartInstance = null;
+
         async function carregarDashboard() {
             if (!supabaseClient) return;
             try {
@@ -462,7 +491,7 @@
                 const primeiroDia = new Date(ano, mes, 1).toISOString().split('T')[0];
                 const ultimoDia = new Date(ano, mes + 1, 0).toISOString().split('T')[0];
 
-                const { data: despMes } = await supabaseClient.from('despesas').select('valor').gte('data', primeiroDia).lte('data', ultimoDia);
+                const { data: despMes } = await supabaseClient.from('despesas').select('valor, categoria').gte('data', primeiroDia).lte('data', ultimoDia);
                 const { data: recMes } = await supabaseClient.from('receitas').select('valor').gte('data', primeiroDia).lte('data', ultimoDia);
                 const { data: resTotais } = await supabaseClient.from('reservas').select('saldo');
 
@@ -478,6 +507,54 @@
                 
                 // Colorir o saldo
                 document.getElementById('saldo-mes').style.color = saldoMes < 0 ? 'var(--accent-red)' : 'var(--accent-green)';
+
+                // --- Gráficos ---
+                const categoriasDict = {};
+                if (despMes) {
+                    despMes.forEach(d => {
+                        const cat = d.categoria || 'Outros';
+                        categoriasDict[cat] = (categoriasDict[cat] || 0) + Number(d.valor);
+                    });
+                }
+                const catLabels = Object.keys(categoriasDict);
+                const catData = Object.values(categoriasDict);
+
+                if (gastosChartInstance) gastosChartInstance.destroy();
+                if (balancoChartInstance) balancoChartInstance.destroy();
+
+                const ctxGastos = document.getElementById('gastosChart');
+                if (ctxGastos) {
+                    gastosChartInstance = new Chart(ctxGastos.getContext('2d'), {
+                        type: 'doughnut',
+                        data: {
+                            labels: catLabels,
+                            datasets: [{
+                                data: catData,
+                                backgroundColor: ['#6366f1', '#10b981', '#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#06b6d4', '#f43f5e', '#84cc16', '#a855f7'],
+                                borderWidth: 0
+                            }]
+                        },
+                        options: { maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#e2e8f0' } } } }
+                    });
+                }
+
+                const ctxBalanco = document.getElementById('balancoChart');
+                if (ctxBalanco) {
+                    balancoChartInstance = new Chart(ctxBalanco.getContext('2d'), {
+                        type: 'bar',
+                        data: {
+                            labels: ['Ganhos', 'Gastos'],
+                            datasets: [{
+                                label: 'Valor no Mês',
+                                data: [ganhosMes, gastosMes],
+                                backgroundColor: ['#10b981', '#ef4444'],
+                                borderRadius: 6
+                            }]
+                        },
+                        options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { color: '#e2e8f0' }, grid: { color: 'rgba(255,255,255,0.1)' } }, x: { ticks: { color: '#e2e8f0' }, grid: { display: false } } } }
+                    });
+                }
+
             } catch (e) { console.error(e); }
             
             carregarDespesas(); // Carrega a tabela
@@ -769,8 +846,30 @@
                 const descricao = document.getElementById('rec-descricao').value;
                 const valor = parseFloat(document.getElementById('rec-valor').value);
                 const banco = document.getElementById('rec-banco').value;
-                const data = document.getElementById('rec-data').value;
-                await supabaseClient.from('receitas').insert([{ descricao, valor, banco, data }]);
+                const dataStr = document.getElementById('rec-data').value;
+                const isFixa = document.getElementById('rec-fixa').checked;
+                
+                const inserts = [];
+                let meses = isFixa ? 12 : 1;
+                
+                let dataBase = new Date(dataStr + 'T12:00:00');
+                
+                for(let i = 0; i < meses; i++) {
+                    let d = new Date(dataBase);
+                    d.setMonth(d.getMonth() + i);
+                    let yy = d.getFullYear();
+                    let mm = String(d.getMonth() + 1).padStart(2, '0');
+                    let dd = String(d.getDate()).padStart(2, '0');
+                    
+                    inserts.push({ 
+                        descricao: isFixa ? `${descricao}` : descricao, 
+                        valor: valor, 
+                        banco: banco, 
+                        data: `${yy}-${mm}-${dd}` 
+                    });
+                }
+                
+                await supabaseClient.from('receitas').insert(inserts);
                 document.getElementById('receita-form').reset();
                 mostrarToast();
                 carregarReceitas();
@@ -900,11 +999,63 @@
                                     <span style="font-size: 0.8rem; opacity: 0.8;">Saldo Atual</span><br>
                                     <strong style="font-size: 1.5rem;">${formatter.format(r.saldo)}</strong>
                                 </div>
-                                <button onclick="editarSaldoReserva('${r.id}', ${r.saldo})" style="margin-top: 15px; width: 100%; background: rgba(0,0,0,0.2); border: none; color: ${textColor}; padding: 8px; border-radius: 6px; cursor: pointer;">Editar Saldo</button>
+                                <button onclick="editarSaldoReserva('${r.id}', ${r.saldo})" style="margin-top: 15px; width: 100%; background: rgba(0,0,0,0.2); border: none; color: ${textColor}; padding: 8px; border-radius: 6px; cursor: pointer;">Atualizar Saldo do Mês</button>
                             </div>
                         `;
                     });
                     container.innerHTML = html;
+
+                    // Montar Gráfico de Evolução Patrimonial
+                    if (reservasChartInstance) reservasChartInstance.destroy();
+                    const { data: historico } = await supabaseClient.from('historico_reservas').select('*').order('data_registro', { ascending: true });
+                    
+                    if (historico && historico.length > 0) {
+                        const allDates = [...new Set(historico.map(h => h.data_registro))].sort();
+                        const datasets = [];
+                        const cores = ['#8b5cf6', '#f59e0b', '#3b82f6', '#10b981', '#ef4444', '#ec4899'];
+                        let corIdx = 0;
+
+                        reservas.forEach(r => {
+                            const histReserva = historico.filter(h => h.reserva_id === r.id);
+                            if (histReserva.length > 0) {
+                                const dataPoints = [];
+                                let lastVal = 0; // Se não tinha no mês, assume o valor anterior (ou 0 no inicio)
+                                allDates.forEach(d => {
+                                    // pega a última atualização daquele dia
+                                    const updatesDoDia = histReserva.filter(x => x.data_registro === d);
+                                    if (updatesDoDia.length > 0) {
+                                        lastVal = updatesDoDia[updatesDoDia.length - 1].saldo;
+                                    }
+                                    dataPoints.push(lastVal);
+                                });
+                                
+                                datasets.push({
+                                    label: r.nome,
+                                    data: dataPoints,
+                                    borderColor: cores[corIdx % cores.length],
+                                    backgroundColor: cores[corIdx % cores.length],
+                                    tension: 0.3
+                                });
+                                corIdx++;
+                            }
+                        });
+
+                        const ctxRes = document.getElementById('reservasChart');
+                        if (ctxRes) {
+                            reservasChartInstance = new Chart(ctxRes.getContext('2d'), {
+                                type: 'line',
+                                data: { labels: allDates.map(d => formatData(d)), datasets: datasets },
+                                options: { 
+                                    maintainAspectRatio: false, 
+                                    scales: { 
+                                        x: { ticks: { color: '#e2e8f0' }, grid: { display: false } },
+                                        y: { ticks: { color: '#e2e8f0' }, grid: { color: 'rgba(255,255,255,0.1)' } }
+                                    },
+                                    plugins: { legend: { labels: { color: '#e2e8f0' } } }
+                                }
+                            });
+                        }
+                    }
                 }
             } catch (err) { alert(err.message); }
         }
@@ -918,12 +1069,14 @@
         };
 
         window.editarSaldoReserva = async function(id, saldoAtual) {
-            const novoSaldoStr = prompt("Qual o novo saldo atual (em R$)?", saldoAtual);
+            const novoSaldoStr = prompt("Qual o novo saldo atual da caixinha (em R$)?", saldoAtual);
             if(novoSaldoStr === null) return;
             const novoSaldo = parseFloat(novoSaldoStr.replace(',', '.'));
             if(isNaN(novoSaldo)) { alert("Valor numérico inválido!"); return; }
             try {
                 await supabaseClient.from('reservas').update({ saldo: novoSaldo }).match({ id: id });
+                const dataHoje = new Date().toISOString().split('T')[0];
+                await supabaseClient.from('historico_reservas').insert([{ reserva_id: id, saldo: novoSaldo, data_registro: dataHoje }]);
                 carregarReservas();
             } catch (err) { alert(err.message); }
         };
@@ -936,7 +1089,15 @@
                 const banco = document.getElementById('res-banco').value;
                 const nome = document.getElementById('res-nome').value;
                 const saldo = parseFloat(document.getElementById('res-saldo').value);
-                await supabaseClient.from('reservas').insert([{ banco, nome, saldo }]);
+                
+                const { data, error } = await supabaseClient.from('reservas').insert([{ banco, nome, saldo }]).select();
+                if (error) throw error;
+                
+                if (data && data.length > 0) {
+                    const dataHoje = new Date().toISOString().split('T')[0];
+                    await supabaseClient.from('historico_reservas').insert([{ reserva_id: data[0].id, saldo: saldo, data_registro: dataHoje }]);
+                }
+                
                 document.getElementById('reserva-form').reset();
                 mostrarToast();
                 carregarReservas();
