@@ -177,10 +177,10 @@
         const SUPABASE_URL = 'https://mmvieranrinduaxlgjua.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tdmllcmFucmluZHVheGxnanVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MzQxMTAsImV4cCI6MjA5ODExMDExMH0.qR1XZYpmvWEaA-PhCBJg06PJodhqu4U5XI_SM2gsPz8';
 
-        let supabase = null;
+        let supabaseClient = null;
         try {
             if (window.supabase) {
-                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             }
         } catch (e) {
             alert("Erro ao conectar no banco: " + e.message);
@@ -224,14 +224,14 @@
 
         async function carregarDespesas() {
             const tbody = document.getElementById('expenses-tbody');
-            if (!supabase) {
+            if (!supabaseClient) {
                 tbody.innerHTML = '<tr><td colspan="4" class="loading-td">Sistema Offline. Verifique sua conexão.</td></tr>';
                 return;
             }
             tbody.innerHTML = '<tr><td colspan="4" class="loading-td">Sincronizando despesas...</td></tr>';
 
             try {
-                const { data: despesas, error } = await supabase
+                const { data: despesas, error } = await supabaseClient
                     .from('despesas')
                     .select('*')
                     .order('data', { ascending: false });
@@ -271,7 +271,7 @@
 
         document.getElementById('expense-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            if (!supabase) {
+            if (!supabaseClient) {
                 alert("Sistema offline!");
                 return;
             }
@@ -286,7 +286,7 @@
             btnSubmit.disabled = true;
 
             try {
-                const { error } = await supabase.from('despesas').insert([{ descricao, valor, categoria, data }]);
+                const { error } = await supabaseClient.from('despesas').insert([{ descricao, valor, categoria, data }]);
                 if (error) throw error;
 
                 document.getElementById('expense-form').reset();
