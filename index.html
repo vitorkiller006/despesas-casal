@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Despesas do Casal</title>
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Nosso CSS e JS -->
+    <link rel="stylesheet" href="style.css?v=2">
+</head>
+<body>
+    <div class="app-container">
+        
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fa-solid fa-wallet"></i> Controle</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="active" id="nav-dashboard" onclick="switchView('view-dashboard', this)"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
+                <a href="#" id="nav-add" onclick="switchView('view-add', this)"><i class="fa-solid fa-plus"></i> Novo Lançamento</a>
+            </nav>
+            <div class="sidebar-footer">
+                <p>Nossas Despesas ♥</p>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            
+            <header class="top-header">
+                <div class="header-titles">
+                    <h1 id="page-title">Dashboard</h1>
+                    <p class="subtitle" id="page-subtitle">Resumo dos nossos gastos deste mês</p>
+                </div>
+                <div class="user-profile">
+                    <div class="avatar">
+                        <i class="fa-solid fa-user-group"></i>
+                    </div>
+                </div>
+            </header>
+
+            <!-- DASHBOARD VIEW -->
+            <section id="view-dashboard" class="view-section active">
+                
+                <!-- Summary Cards -->
+                <div class="dashboard-cards">
+                    <div class="card summary-card gradient-blue">
+                        <div class="card-icon"><i class="fa-solid fa-brazilian-real-sign"></i></div>
+                        <div class="card-info">
+                            <h3>Total Gasto</h3>
+                            <h2 id="total-gasto">R$ 0,00</h2>
+                        </div>
+                    </div>
+                    
+                    <div class="card summary-card gradient-purple">
+                        <div class="card-icon"><i class="fa-solid fa-receipt"></i></div>
+                        <div class="card-info">
+                            <h3>Lançamentos</h3>
+                            <h2 id="total-lancamentos">0</h2>
+                        </div>
+                    </div>
+                    
+                    <div class="card summary-card gradient-emerald">
+                        <div class="card-icon"><i class="fa-solid fa-calendar-day"></i></div>
+                        <div class="card-info">
+                            <h3>Última Despesa</h3>
+                            <h2 id="ultima-data">--/--/----</h2>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Expenses Table -->
+                <div class="card recent-expenses">
+                    <div class="card-header">
+                        <h3>Últimas Despesas</h3>
+                        <button class="btn-sm btn-primary" onclick="switchView('view-add', document.getElementById('nav-add'))">Adicionar</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="expenses-table">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Descrição</th>
+                                    <th>Categoria</th>
+                                    <th>Valor</th>
+                                </tr>
+                            </thead>
+                            <tbody id="expenses-tbody">
+                                <!-- Preenchido dinamicamente via JS -->
+                                <tr><td colspan="4" class="loading-td">Aguardando conexão com Supabase...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ADD EXPENSE VIEW -->
+            <section id="view-add" class="view-section">
+                <div class="card form-card">
+                    <h3>Registrar Nova Despesa</h3>
+                    <form id="expense-form">
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="descricao">Descrição (O que compramos?)</label>
+                                <input type="text" id="descricao" required placeholder="Ex: Compra no Assaí">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="valor">Valor (R$)</label>
+                                <input type="number" id="valor" step="0.01" required placeholder="0.00">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="categoria">Categoria</label>
+                                <select id="categoria" required>
+                                    <option value="" disabled selected>Selecione uma categoria...</option>
+                                    <option value="Mercado">🛒 Mercado</option>
+                                    <option value="Lazer">🍿 Lazer & Saídas</option>
+                                    <option value="Contas">📄 Contas da Casa</option>
+                                    <option value="Transporte">🚗 Transporte (Uber/Gasolina)</option>
+                                    <option value="Saude">💊 Saúde & Farmácia</option>
+                                    <option value="Pets">🐶 Pets</option>
+                                    <option value="Outros">📦 Outros</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="data">Data da Compra</label>
+                                <input type="date" id="data" required>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-secondary" onclick="switchView('view-dashboard', document.getElementById('nav-dashboard'))">Cancelar</button>
+                            <button type="submit" class="btn btn-primary" id="btn-submit">
+                                <i class="fa-solid fa-check"></i> Salvar Despesa
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast">Despesa salva com sucesso!</div>
+
+    <script src="app.js?v=2"></script>
+</body>
+</html>
