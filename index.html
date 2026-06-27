@@ -150,7 +150,7 @@
                                     <option value="" disabled selected>Selecione...</option>
                                     <option value="Mercado">🛒 Mercado</option>
                                     <option value="Lazer">🍿 Lazer & Saídas</option>
-                                    <option value="Streamings">📺 Streamings (Netflix, Spotify)</option>
+                                    <option value="Streamings">📺 Streamings</option>
                                     <option value="Contas">📄 Contas da Casa</option>
                                     <option value="Transporte">🚗 Transporte</option>
                                     <option value="Saude">💊 Saúde & Farmácia</option>
@@ -193,6 +193,10 @@
                             <div class="form-group">
                                 <label for="parcelas">Qtd. Parcelas</label>
                                 <input type="number" id="parcelas" min="1" max="60" value="1" required>
+                            </div>
+                            <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-top: 25px;">
+                                <input type="checkbox" id="recorrente" style="width: 20px; height: 20px; cursor: pointer;">
+                                <label for="recorrente" style="margin: 0; cursor: pointer;">Despesa Fixa / Recorrente (Todo Mês)</label>
                             </div>
                         </div>
 
@@ -545,7 +549,12 @@
             const dataStr = document.getElementById('data').value;
             const forma_pagamento = document.getElementById('forma_pagamento').value;
             const banco = document.getElementById('banco').value;
-            const parcelas = parseInt(document.getElementById('parcelas').value);
+            let parcelas = parseInt(document.getElementById('parcelas').value);
+            const isRecorrente = document.getElementById('recorrente').checked;
+
+            if (isRecorrente) {
+                parcelas = 60; // Lança a despesa recorrente por 5 anos (60 meses) pra frente
+            }
 
             const btnSubmit = document.getElementById('btn-submit');
             btnSubmit.innerHTML = 'Processando...';
@@ -561,13 +570,18 @@
                     if (error) throw error;
                     editandoDespesaId = null; // reseta
                 } else {
-                    // Modo de criação: cria múltiplas se tiver parcelas
+                    // Modo de criação: cria múltiplas se tiver parcelas ou for recorrente
                     const inserts = [];
-                    const valorParcela = valorTotal / parcelas;
+                    const valorParcela = isRecorrente ? valorTotal : (valorTotal / parcelas);
                     const dataBase = new Date(dataStr + 'T12:00:00');
 
                     for (let i = 0; i < parcelas; i++) {
-                        let desc = parcelas > 1 ? `${descricao} (Parc. ${i+1}/${parcelas})` : descricao;
+                        let desc = descricao;
+                        if (!isRecorrente && parcelas > 1) {
+                            desc = `${descricao} (Parc. ${i+1}/${parcelas})`;
+                        } else if (isRecorrente) {
+                            desc = `${descricao}`; // Mantem igual, ou pode colocar (Recorrente)
+                        }
                         let novaData = new Date(dataBase);
                         novaData.setMonth(novaData.getMonth() + i);
                         let y = novaData.getFullYear();
@@ -584,6 +598,8 @@
                 }
 
                 document.getElementById('expense-form').reset();
+                document.getElementById('parcelas').disabled = false;
+                document.getElementById('recorrente').disabled = false;
                 // Reseta a lista de bancos para o padrão
                 document.getElementById('forma_pagamento').dispatchEvent(new Event('change'));
                 
@@ -616,6 +632,8 @@
             
             document.getElementById('parcelas').value = 1; // Editar não repassa parcelas
             document.getElementById('parcelas').disabled = true; // Desabilita mudar parcelas na edição
+            document.getElementById('recorrente').checked = false;
+            document.getElementById('recorrente').disabled = true; // Desabilita mudar recorrencia na edição
             
             document.getElementById('btn-submit').innerHTML = '<i class="fa-solid fa-pen"></i> Atualizar Despesa';
             switchView('view-add', document.getElementById('nav-add'));
