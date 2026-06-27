@@ -1,34 +1,28 @@
 // --- CONFIGURAÇÃO SUPABASE ---
-// Aqui nós vamos colocar a chave que você me mandar
 const SUPABASE_URL = 'https://mmvieranrinduaxlgjua.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tdmllcmFucmluZHVheGxnanVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MzQxMTAsImV4cCI6MjA5ODExMDExMH0.qR1XZYpmvWEaA-PhCBJg06PJodhqu4U5XI_SM2gsPz8';
 
 let supabase = null;
-if (SUPABASE_ANON_KEY !== 'AQUI_VAI_A_SUA_CHAVE_ANON') {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+try {
+    if (window.supabase) {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } else {
+        console.warn("Biblioteca do Supabase não carregou corretamente.");
+    }
+} catch (e) {
+    console.error("Erro ao inicializar Supabase:", e);
 }
 
-// Formatação de Moeda
-const formatter = new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL'
-});
-
-// Formatação de Data
-function formatData(dataISO) {
-    if (!dataISO) return '--/--/----';
-    const [ano, mes, dia] = dataISO.split('T')[0].split('-');
-    return `${dia}/${mes}/${ano}`;
-}
-
-// Navegação entre Telas
-function switchView(viewId, navElement) {
+// --- FUNÇÕES GLOBAIS DE INTERFACE ---
+// Navegação entre Telas - Agora totalmente segura contra falhas de rede
+window.switchView = function(viewId, navElement) {
     // Esconder todas as seções
     document.querySelectorAll('.view-section').forEach(sec => {
         sec.classList.remove('active');
     });
     // Mostrar a selecionada
-    document.getElementById(viewId).classList.add('active');
+    const target = document.getElementById(viewId);
+    if(target) target.classList.add('active');
 
     // Atualizar menu lateral
     if (navElement) {
@@ -41,12 +35,30 @@ function switchView(viewId, navElement) {
     }
 }
 
-// Carregar Despesas do Banco de Dados
+// Formatação
+const formatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+function formatData(dataISO) {
+    if (!dataISO) return '--/--/----';
+    const [ano, mes, dia] = dataISO.split('T')[0].split('-');
+    return `${dia}/${mes}/${ano}`;
+}
+
+// Toast Notification
+function mostrarToast() {
+    const toast = document.getElementById('toast');
+    if(toast) {
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+}
+
+
+// --- LÓGICA DE DADOS ---
 async function carregarDespesas() {
     const tbody = document.getElementById('expenses-tbody');
     
     if (!supabase) {
-        tbody.innerHTML = '<tr><td colspan="4" class="loading-td">Supabase não configurado. Adicione a chave no app.js</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="loading-td">Erro: Supabase não conectado. Verifique a internet.</td></tr>';
         return;
     }
 
@@ -63,8 +75,11 @@ async function carregarDespesas() {
         let totalGasto = 0;
         let html = '';
 
-        if (despesas.length === 0) {
+        if (!despesas || despesas.length === 0) {
             html = '<tr><td colspan="4" class="loading-td">Nenhuma despesa lançada ainda!</td></tr>';
+            document.getElementById('total-gasto').innerText = 'R$ 0,00';
+            document.getElementById('total-lancamentos').innerText = '0';
+            document.getElementById('ultima-data').innerText = '--/--/----';
         } else {
             despesas.forEach(d => {
                 totalGasto += Number(d.valor);
@@ -78,17 +93,16 @@ async function carregarDespesas() {
                 `;
             });
             
-            // Atualiza Dashboard
             document.getElementById('ultima-data').innerText = formatData(despesas[0].data);
+            document.getElementById('total-gasto').innerText = formatter.format(totalGasto);
+            document.getElementById('total-lancamentos').innerText = despesas.length;
         }
 
         tbody.innerHTML = html;
-        document.getElementById('total-gasto').innerText = formatter.format(totalGasto);
-        document.getElementById('total-lancamentos').innerText = despesas.length;
 
     } catch (err) {
         console.error('Erro ao carregar:', err);
-        tbody.innerHTML = '<tr><td colspan="4" class="loading-td" style="color: var(--accent-red)">Erro ao carregar os dados. Verifique o console.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="loading-td" style="color: var(--accent-red)">Erro ao carregar os dados do Supabase.</td></tr>';
     }
 }
 
@@ -97,7 +111,7 @@ document.getElementById('expense-form').addEventListener('submit', async (e) => 
     e.preventDefault();
 
     if (!supabase) {
-        alert("Supabase não configurado! Coloque a chave anon no app.js");
+        alert("Supabase não carregado! Verifique sua conexão.");
         return;
     }
 
@@ -113,9 +127,7 @@ document.getElementById('expense-form').addEventListener('submit', async (e) => 
     try {
         const { error } = await supabase
             .from('despesas')
-            .insert([
-                { descricao, valor, categoria, data }
-            ]);
+            .insert([{ descricao, valor, categoria, data }]);
 
         if (error) throw error;
 
@@ -126,23 +138,47 @@ document.getElementById('expense-form').addEventListener('submit', async (e) => 
 
     } catch (err) {
         console.error('Erro ao salvar:', err);
-        alert('Erro ao salvar despesa. Verifique se a tabela foi criada corretamente.');
+        alert('Erro ao salvar despesa. Tem certeza que a tabela foi criada?');
     } finally {
         btnSubmit.innerHTML = '<i class="fa-solid fa-check"></i> Salvar Despesa';
         btnSubmit.disabled = false;
     }
 });
 
-// Toast Notification
-function mostrarToast() {
-    const toast = document.getElementById('toast');
-    toast.classList.add('show');
-    setTimeout(() => {
-        toast.classList.remove('show');
-    }, 3000);
+
+// --- LÓGICA DE LOGIN E INICIALIZAÇÃO ---
+
+function initApp() {
+    const isLoggedIn = localStorage.getItem('despesas_auth') === 'true';
+    
+    if (isLoggedIn) {
+        // Mostra o app e esconde o login
+        document.getElementById('login-container').style.display = 'none';
+        document.getElementById('app-container').style.display = 'flex';
+        carregarDespesas();
+    } else {
+        // Mostra a tela de login
+        document.getElementById('login-container').style.display = 'flex';
+        document.getElementById('app-container').style.display = 'none';
+    }
 }
 
-// Iniciar app carregando dados se a chave estiver configurada
+document.getElementById('login-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const user = document.getElementById('login-user').value.trim();
+    const pass = document.getElementById('login-pass').value.trim();
+    const erroDiv = document.getElementById('login-error');
+
+    if (user === 'vitor' && pass === '@19216801Gg') {
+        localStorage.setItem('despesas_auth', 'true');
+        erroDiv.style.display = 'none';
+        initApp();
+    } else {
+        erroDiv.style.display = 'block';
+    }
+});
+
+// Ao carregar a tela
 window.onload = () => {
-    if (supabase) carregarDespesas();
+    initApp();
 };
