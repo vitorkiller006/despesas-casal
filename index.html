@@ -511,7 +511,10 @@
                     despesas.forEach(d => {
                         html += `
                             <tr>
-                                <td>${formatData(d.data)}</td>
+                                <td>
+                                    <strong>${formatData(d.data)}</strong>
+                                    ${d.data_compra && d.data_compra !== d.data ? `<br><small style="color: var(--text-secondary); font-size: 0.75rem;">(Comprado em ${formatData(d.data_compra)})</small>` : ''}
+                                </td>
                                 <td>
                                     ${d.descricao}
                                     <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
@@ -586,10 +589,45 @@
             btnSubmit.disabled = true;
 
             try {
+                let dataCompraBase = new Date(dataStr + 'T12:00:00');
+                let dataPrimeiroPagamento = new Date(dataCompraBase);
+
+                if (forma_pagamento === 'Cartão de Crédito') {
+                    const cartao = cartoesCadastrados.find(c => c.nome === banco);
+                    if (cartao && cartao.dia_vencimento) {
+                        let diaFechamento = cartao.dia_fechamento || (cartao.dia_vencimento - 7); 
+                        if (diaFechamento <= 0) diaFechamento += 30;
+
+                        let diaCompra = dataCompraBase.getDate();
+                        let mesCompra = dataCompraBase.getMonth();
+                        let anoCompra = dataCompraBase.getFullYear();
+
+                        let basePagamento = new Date(anoCompra, mesCompra, cartao.dia_vencimento, 12, 0, 0);
+
+                        if (cartao.dia_vencimento < diaFechamento) {
+                            basePagamento.setMonth(basePagamento.getMonth() + 1);
+                        }
+
+                        if (diaCompra >= diaFechamento) {
+                            basePagamento.setMonth(basePagamento.getMonth() + 1);
+                        }
+
+                        while (basePagamento < dataCompraBase) {
+                            basePagamento.setMonth(basePagamento.getMonth() + 1);
+                        }
+
+                        dataPrimeiroPagamento = basePagamento;
+                    }
+                }
+
                 if (editandoDespesaId) {
+                    let yEdit = dataPrimeiroPagamento.getFullYear();
+                    let mEdit = String(dataPrimeiroPagamento.getMonth() + 1).padStart(2, '0');
+                    let dEdit = String(dataPrimeiroPagamento.getDate()).padStart(2, '0');
+
                     // Modo de edição: atualiza apenas uma despesa (ignora criação de múltiplas parcelas novas)
                     const { error } = await supabaseClient.from('despesas').update({
-                        descricao, valor: valorTotal, categoria, data: dataStr, banco, forma_pagamento
+                        descricao, valor: valorTotal, categoria, data: `${yEdit}-${mEdit}-${dEdit}`, data_compra: dataStr, banco, forma_pagamento
                     }).match({ id: editandoDespesaId });
                     
                     if (error) throw error;
@@ -598,7 +636,6 @@
                     // Modo de criação: cria múltiplas se tiver parcelas ou for recorrente
                     const inserts = [];
                     const valorParcela = isRecorrente ? valorTotal : (valorTotal / parcelas);
-                    const dataBase = new Date(dataStr + 'T12:00:00');
 
                     for (let i = 0; i < parcelas; i++) {
                         let desc = descricao;
@@ -607,14 +644,15 @@
                         } else if (isRecorrente) {
                             desc = `${descricao}`; // Mantem igual, ou pode colocar (Recorrente)
                         }
-                        let novaData = new Date(dataBase);
-                        novaData.setMonth(novaData.getMonth() + i);
-                        let y = novaData.getFullYear();
-                        let m = String(novaData.getMonth() + 1).padStart(2, '0');
-                        let d = String(novaData.getDate()).padStart(2, '0');
+                        
+                        let novaDataPagamento = new Date(dataPrimeiroPagamento);
+                        novaDataPagamento.setMonth(novaDataPagamento.getMonth() + i);
+                        let yp = novaDataPagamento.getFullYear();
+                        let mp = String(novaDataPagamento.getMonth() + 1).padStart(2, '0');
+                        let dp = String(novaDataPagamento.getDate()).padStart(2, '0');
                         
                         inserts.push({
-                            descricao: desc, valor: valorParcela, categoria: categoria, data: `${y}-${m}-${d}`,
+                            descricao: desc, valor: valorParcela, categoria: categoria, data: `${yp}-${mp}-${dp}`, data_compra: dataStr,
                             banco: banco, forma_pagamento: forma_pagamento, parcelas: String(parcelas), num_parcela: String(i+1)
                         });
                     }
