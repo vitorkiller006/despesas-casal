@@ -165,7 +165,7 @@ function initApp() {
 
 document.getElementById('login-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    const user = document.getElementById('login-user').value.trim();
+    const user = document.getElementById('login-user').value.trim().toLowerCase();
     const pass = document.getElementById('login-pass').value.trim();
     const erroDiv = document.getElementById('login-error');
 
