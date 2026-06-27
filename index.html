@@ -30,7 +30,6 @@
                 <a href="javascript:void(0)" class="active" id="nav-dashboard" onclick="switchView('view-dashboard', this)"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
                 <a href="javascript:void(0)" id="nav-receitas" onclick="switchView('view-receitas', this)"><i class="fa-solid fa-arrow-trend-up"></i> Ganhos do Mês</a>
                 <a href="javascript:void(0)" id="nav-cartoes" onclick="switchView('view-cartoes', this)"><i class="fa-solid fa-credit-card"></i> Cartões</a>
-                <a href="javascript:void(0)" id="nav-reservas" onclick="switchView('view-reservas', this)"><i class="fa-solid fa-piggy-bank"></i> Reservas</a>
                 <a href="javascript:void(0)" id="nav-add" onclick="switchView('view-add', this)"><i class="fa-solid fa-plus"></i> Lançar Despesa</a>
             </nav>
             <div class="sidebar-footer">
@@ -93,12 +92,13 @@
                             </div>
                         </div>
 
-                        <div class="card summary-card" style="border-left: 4px solid var(--accent-purple); display: flex; align-items: center; gap: 15px;">
-                            <div style="background: rgba(162, 155, 254, 0.1); color: var(--accent-purple); padding: 15px; border-radius: 12px; font-size: 1.5rem;"><i class="fa-solid fa-piggy-bank"></i></div>
+                        <div class="card summary-card" style="border-left: 4px solid var(--accent-purple); display: flex; align-items: center; gap: 15px; position: relative;">
+                            <div style="background: rgba(162, 155, 254, 0.1); color: var(--accent-purple); padding: 15px; border-radius: 12px; font-size: 1.5rem;"><i class="fa-solid fa-wallet"></i></div>
                             <div>
-                                <p style="font-size: 0.9rem; color: var(--text-secondary);">Total Guardado</p>
+                                <p style="font-size: 0.9rem; color: var(--text-secondary);">Caixa no Fim do Mês</p>
                                 <h2 id="total-guardado">R$ 0,00</h2>
                             </div>
+                            <button onclick="configurarSaldoInicial()" style="position: absolute; top: 10px; right: 10px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer;" title="Configurar Saldo Inicial"><i class="fa-solid fa-gear"></i></button>
                         </div>
 
                     </div>
@@ -479,6 +479,28 @@
         let balancoChartInstance = null;
         let reservasChartInstance = null;
 
+        window.configurarSaldoInicial = async function() {
+            if(!supabaseClient) return;
+            try {
+                const { data: resInit } = await supabaseClient.from('reservas').select('id, saldo').eq('nome', 'Saldo Inicial Conta').maybeSingle();
+                let saldoAtual = resInit ? resInit.saldo : 0;
+                
+                const novoSaldoStr = prompt("Qual o Saldo Inicial da sua conta bancária? (Valor antes de contar os lançamentos no app)", saldoAtual);
+                if(novoSaldoStr === null) return;
+                
+                const novoSaldo = parseFloat(novoSaldoStr.replace(',', '.'));
+                if(isNaN(novoSaldo)) { alert("Valor numérico inválido!"); return; }
+                
+                if (resInit) {
+                    await supabaseClient.from('reservas').update({ saldo: novoSaldo }).match({ id: resInit.id });
+                } else {
+                    await supabaseClient.from('reservas').insert([{ nome: 'Saldo Inicial Conta', saldo: novoSaldo, banco: 'Geral' }]);
+                }
+                
+                carregarDashboard();
+            } catch(e) { console.error(e); }
+        };
+
         async function carregarDashboard() {
             if (!supabaseClient) return;
             try {
@@ -493,17 +515,27 @@
 
                 const { data: despMes } = await supabaseClient.from('despesas').select('valor, categoria').gte('data', primeiroDia).lte('data', ultimoDia);
                 const { data: recMes } = await supabaseClient.from('receitas').select('valor').gte('data', primeiroDia).lte('data', ultimoDia);
-                const { data: resTotais } = await supabaseClient.from('reservas').select('saldo');
+                
+                const { data: despAteMes } = await supabaseClient.from('despesas').select('valor').lte('data', ultimoDia);
+                const { data: recAteMes } = await supabaseClient.from('receitas').select('valor').lte('data', ultimoDia);
+
+                const { data: resInit } = await supabaseClient.from('reservas').select('id, saldo').eq('nome', 'Saldo Inicial Conta').maybeSingle();
+                let saldoInicial = resInit ? resInit.saldo : 0;
 
                 let gastosMes = despMes ? despMes.reduce((acc, curr) => acc + Number(curr.valor), 0) : 0;
                 let ganhosMes = recMes ? recMes.reduce((acc, curr) => acc + Number(curr.valor), 0) : 0;
                 let saldoMes = ganhosMes - gastosMes;
-                let guardadoTotal = resTotais ? resTotais.reduce((acc, curr) => acc + Number(curr.saldo), 0) : 0;
+
+                let gastosAteMes = despAteMes ? despAteMes.reduce((acc, curr) => acc + Number(curr.valor), 0) : 0;
+                let ganhosAteMes = recAteMes ? recAteMes.reduce((acc, curr) => acc + Number(curr.valor), 0) : 0;
+                let caixaNoFimDoMes = saldoInicial + ganhosAteMes - gastosAteMes;
 
                 document.getElementById('total-gasto').innerText = formatter.format(gastosMes);
                 document.getElementById('total-ganhos').innerText = formatter.format(ganhosMes);
                 document.getElementById('saldo-mes').innerText = formatter.format(saldoMes);
-                document.getElementById('total-guardado').innerText = formatter.format(guardadoTotal);
+                document.getElementById('total-guardado').innerText = formatter.format(caixaNoFimDoMes);
+                
+                document.getElementById('total-guardado').style.color = caixaNoFimDoMes < 0 ? 'var(--accent-red)' : 'var(--text-primary)';
                 
                 // Colorir o saldo
                 document.getElementById('saldo-mes').style.color = saldoMes < 0 ? 'var(--accent-red)' : 'var(--accent-green)';
