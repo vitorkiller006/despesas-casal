@@ -1,3 +1,8 @@
+window.onerror = function(msg, url, lineNo, columnNo, error) {
+    alert("Erro JS: " + msg + " na linha " + lineNo);
+    return false;
+};
+
 // --- CONFIGURAÇÃO SUPABASE ---
 const SUPABASE_URL = 'https://mmvieranrinduaxlgjua.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tdmllcmFucmluZHVheGxnanVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MzQxMTAsImV4cCI6MjA5ODExMDExMH0.qR1XZYpmvWEaA-PhCBJg06PJodhqu4U5XI_SM2gsPz8';
@@ -7,35 +12,37 @@ try {
     if (window.supabase) {
         supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     } else {
-        console.warn("Biblioteca do Supabase não carregou corretamente.");
+        console.warn("Biblioteca do Supabase não carregou.");
     }
 } catch (e) {
     console.error("Erro ao inicializar Supabase:", e);
 }
 
 // --- FUNÇÕES GLOBAIS DE INTERFACE ---
-// Navegação entre Telas - Agora totalmente segura contra falhas de rede
 window.switchView = function(viewId, navElement) {
-    // Esconder todas as seções
-    document.querySelectorAll('.view-section').forEach(sec => {
-        sec.classList.remove('active');
-    });
-    // Mostrar a selecionada
-    const target = document.getElementById(viewId);
-    if(target) target.classList.add('active');
+    try {
+        // Esconder todas as seções
+        document.querySelectorAll('.view-section').forEach(sec => {
+            sec.classList.remove('active');
+        });
+        // Mostrar a selecionada
+        const target = document.getElementById(viewId);
+        if(target) target.classList.add('active');
 
-    // Atualizar menu lateral
-    if (navElement) {
-        document.querySelectorAll('.sidebar-nav a').forEach(a => a.classList.remove('active'));
-        navElement.classList.add('active');
-    }
+        // Atualizar menu lateral
+        if (navElement) {
+            document.querySelectorAll('.sidebar-nav a').forEach(a => a.classList.remove('active'));
+            navElement.classList.add('active');
+        }
 
-    if (viewId === 'view-dashboard') {
-        carregarDespesas();
+        if (viewId === 'view-dashboard') {
+            carregarDespesas();
+        }
+    } catch (e) {
+        alert("Erro no switchView: " + e.message);
     }
 }
 
-// Formatação
 const formatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 function formatData(dataISO) {
     if (!dataISO) return '--/--/----';
@@ -43,7 +50,6 @@ function formatData(dataISO) {
     return `${dia}/${mes}/${ano}`;
 }
 
-// Toast Notification
 function mostrarToast() {
     const toast = document.getElementById('toast');
     if(toast) {
@@ -52,17 +58,15 @@ function mostrarToast() {
     }
 }
 
-
-// --- LÓGICA DE DADOS ---
 async function carregarDespesas() {
     const tbody = document.getElementById('expenses-tbody');
     
     if (!supabase) {
-        tbody.innerHTML = '<tr><td colspan="4" class="loading-td">Erro: Supabase não conectado. Verifique a internet.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="loading-td">Supabase desconectado.</td></tr>';
         return;
     }
 
-    tbody.innerHTML = '<tr><td colspan="4" class="loading-td"><i class="fa-solid fa-spinner fa-spin"></i> Carregando...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="loading-td">Carregando...</td></tr>';
 
     try {
         const { data: despesas, error } = await supabase
@@ -99,19 +103,17 @@ async function carregarDespesas() {
         }
 
         tbody.innerHTML = html;
-
     } catch (err) {
-        console.error('Erro ao carregar:', err);
-        tbody.innerHTML = '<tr><td colspan="4" class="loading-td" style="color: var(--accent-red)">Erro ao carregar os dados do Supabase.</td></tr>';
+        alert("Erro ao carregar do banco: " + err.message);
+        tbody.innerHTML = '<tr><td colspan="4" class="loading-td" style="color: red">Erro ao carregar.</td></tr>';
     }
 }
 
-// Salvar Nova Despesa
 document.getElementById('expense-form').addEventListener('submit', async (e) => {
     e.preventDefault();
 
     if (!supabase) {
-        alert("Supabase não carregado! Verifique sua conexão.");
+        alert("Supabase não carregado!");
         return;
     }
 
@@ -121,7 +123,7 @@ document.getElementById('expense-form').addEventListener('submit', async (e) => 
     const data = document.getElementById('data').value;
 
     const btnSubmit = document.getElementById('btn-submit');
-    btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
+    btnSubmit.innerHTML = 'Salvando...';
     btnSubmit.disabled = true;
 
     try {
@@ -131,33 +133,28 @@ document.getElementById('expense-form').addEventListener('submit', async (e) => 
 
         if (error) throw error;
 
-        // Limpa form e volta pro inicio
         document.getElementById('expense-form').reset();
         mostrarToast();
         switchView('view-dashboard', document.getElementById('nav-dashboard'));
-
     } catch (err) {
-        console.error('Erro ao salvar:', err);
-        alert('Erro ao salvar despesa. Tem certeza que a tabela foi criada?');
+        alert('Erro ao salvar despesa: ' + err.message);
     } finally {
-        btnSubmit.innerHTML = '<i class="fa-solid fa-check"></i> Salvar Despesa';
+        btnSubmit.innerHTML = 'Salvar Despesa';
         btnSubmit.disabled = false;
     }
 });
 
-
-// --- LÓGICA DE LOGIN E INICIALIZAÇÃO ---
-
 function initApp() {
-    const isLoggedIn = localStorage.getItem('despesas_auth') === 'true';
+    let isLoggedIn = false;
+    try {
+        isLoggedIn = localStorage.getItem('despesas_auth') === 'true';
+    } catch(e) {}
     
     if (isLoggedIn) {
-        // Mostra o app e esconde o login
         document.getElementById('login-container').style.display = 'none';
         document.getElementById('app-container').style.display = 'flex';
         carregarDespesas();
     } else {
-        // Mostra a tela de login
         document.getElementById('login-container').style.display = 'flex';
         document.getElementById('app-container').style.display = 'none';
     }
@@ -165,20 +162,30 @@ function initApp() {
 
 document.getElementById('login-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    const user = document.getElementById('login-user').value.trim().toLowerCase();
-    const pass = document.getElementById('login-pass').value.trim();
-    const erroDiv = document.getElementById('login-error');
+    try {
+        const user = document.getElementById('login-user').value.trim().toLowerCase();
+        const pass = document.getElementById('login-pass').value.trim();
+        const erroDiv = document.getElementById('login-error');
 
-    if (user === 'vitor' && pass === '@19216801Gg') {
-        localStorage.setItem('despesas_auth', 'true');
-        erroDiv.style.display = 'none';
-        initApp();
-    } else {
-        erroDiv.style.display = 'block';
+        // Aceita qualquer erro de digitação no usuário desde que contenha 'vitor' ou se ele usar a nova/velha senha
+        if ((user === 'vitor' || user.includes('vitor')) && 
+            (pass === '@19216801Gg' || pass === '@19216801GgJlsp2000#')) {
+            
+            try {
+                localStorage.setItem('despesas_auth', 'true');
+            } catch(ex) { /* Ignora erro de localStorage */ }
+            
+            erroDiv.style.display = 'none';
+            initApp();
+        } else {
+            erroDiv.style.display = 'block';
+            erroDiv.innerText = "Usuário ou senha incorretos!";
+        }
+    } catch (err) {
+        alert("Erro no script de login: " + err.message);
     }
 });
 
-// Ao carregar a tela
-window.onload = () => {
+document.addEventListener('DOMContentLoaded', () => {
     initApp();
-};
+});
