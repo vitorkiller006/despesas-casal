@@ -120,9 +120,14 @@
 
                 <!-- Recent Expenses Table -->
                 <div class="card recent-expenses">
-                    <div class="card-header">
+                    <div class="card-header" style="flex-wrap: wrap; gap: 10px;">
                         <h3>Últimas Despesas</h3>
-                        <button class="btn-sm btn-primary" onclick="switchView('view-add', document.getElementById('nav-add'))">Adicionar</button>
+                        <div style="display: flex; gap: 10px;">
+                            <select id="filtro-tabela-cat" class="form-input" style="padding: 5px 10px; margin: 0; width: auto; background: var(--bg-color); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary);" onchange="carregarDespesas()">
+                                <option value="">Todas as Categorias</option>
+                            </select>
+                            <button class="btn-sm btn-primary" onclick="switchView('view-add', document.getElementById('nav-add'))">Adicionar</button>
+                        </div>
                     </div>
                     <div class="table-responsive">
                         <table class="expenses-table">
@@ -548,8 +553,22 @@
                         categoriasDict[cat] = (categoriasDict[cat] || 0) + Number(d.valor);
                     });
                 }
-                const catLabels = Object.keys(categoriasDict);
+                const catLabelsFormatted = Object.keys(categoriasDict).map(k => {
+                    const percent = gastosMes > 0 ? ((categoriasDict[k] / gastosMes) * 100).toFixed(1) : 0;
+                    return `${k} (${percent}% - ${formatter.format(categoriasDict[k])})`;
+                });
                 const catData = Object.values(categoriasDict);
+
+                // Popula o select de filtro
+                const selectCat = document.getElementById('filtro-tabela-cat');
+                if (selectCat) {
+                    const valAtual = selectCat.value;
+                    let optionsHtml = '<option value="">Todas as Categorias</option>';
+                    Object.keys(categoriasDict).sort().forEach(k => {
+                        optionsHtml += `<option value="${k}" ${valAtual === k ? 'selected' : ''}>${k}</option>`;
+                    });
+                    selectCat.innerHTML = optionsHtml;
+                }
 
                 if (gastosChartInstance) gastosChartInstance.destroy();
                 if (balancoChartInstance) balancoChartInstance.destroy();
@@ -559,7 +578,7 @@
                     gastosChartInstance = new Chart(ctxGastos.getContext('2d'), {
                         type: 'doughnut',
                         data: {
-                            labels: catLabels,
+                            labels: catLabelsFormatted,
                             datasets: [{
                                 data: catData,
                                 backgroundColor: ['#6366f1', '#10b981', '#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#06b6d4', '#f43f5e', '#84cc16', '#a855f7'],
@@ -618,12 +637,15 @@
 
                 if (error) throw error;
 
+                const catFiltro = document.getElementById('filtro-tabela-cat') ? document.getElementById('filtro-tabela-cat').value : '';
+                const despesasFiltradas = catFiltro ? despesas.filter(d => (d.categoria || 'Outros') === catFiltro) : despesas;
+
                 let html = '';
 
-                if (!despesas || despesas.length === 0) {
+                if (!despesasFiltradas || despesasFiltradas.length === 0) {
                     html = '<tr><td colspan="5" class="loading-td">Nenhuma despesa lançada ainda!</td></tr>';
                 } else {
-                    despesas.forEach(d => {
+                    despesasFiltradas.forEach(d => {
                         html += `
                             <tr>
                                 <td>
