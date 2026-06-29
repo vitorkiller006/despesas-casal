@@ -19,7 +19,23 @@
     <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
-    <div class="app-container" id="app-container">
+    <div id="login-overlay">
+        <div class="login-box">
+            <h2><i class="fa-solid fa-lock"></i> Acesso Restrito</h2>
+            <div class="form-group">
+                <label>Usuário</label>
+                <input type="text" id="login-user" placeholder="Digite seu usuário" onkeypress="if(event.key === 'Enter') fazerLogin()">
+            </div>
+            <div class="form-group">
+                <label>Senha</label>
+                <input type="password" id="login-pass" placeholder="Digite sua senha" onkeypress="if(event.key === 'Enter') fazerLogin()">
+            </div>
+            <div id="login-error" class="error-msg">Usuário ou senha incorretos!</div>
+            <button onclick="fazerLogin()" style="margin-top: 15px;">Entrar</button>
+        </div>
+    </div>
+
+    <div class="app-container" id="app-container" style="display: none;">
         
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
@@ -34,6 +50,7 @@
             </nav>
             <div class="sidebar-footer">
                 <p>Nossas Despesas ♥</p>
+                <button onclick="fazerLogout()" style="margin-top: 10px; background: rgba(255,255,255,0.1); border: none; color: var(--text-secondary); padding: 5px 15px; border-radius: 5px; cursor: pointer; width: 100%;"><i class="fa-solid fa-right-from-bracket"></i> Sair</button>
             </div>
         </aside>
 
@@ -1163,9 +1180,44 @@
         document.getElementById('mes-filtro').value = `${hojeFilter.getFullYear()}-${String(hojeFilter.getMonth() + 1).padStart(2, '0')}`;
         document.getElementById('mes-filtro').addEventListener('change', carregarDashboard);
 
-        // Força a chamada imediata na aba inicial
-        carregarDashboard();
-        carregarCartoes(); // Popula silenciosamente os cartoes globais para o formulário de despesas
+        // ==========================================
+        // LOGIN LOGIC
+        // ==========================================
+        function verificarLogin() {
+            if (localStorage.getItem('isLogged') === 'true') {
+                document.getElementById('login-overlay').style.display = 'none';
+                document.getElementById('app-container').style.display = 'flex';
+                // Inicia o app apenas se logado
+                carregarDashboard();
+                carregarCartoes();
+            } else {
+                document.getElementById('login-overlay').style.display = 'flex';
+                document.getElementById('app-container').style.display = 'none';
+            }
+        }
+
+        window.fazerLogin = function() {
+            const user = document.getElementById('login-user').value;
+            const pass = document.getElementById('login-pass').value;
+            if (user === 'vitor' && pass === '@19216801Gg') {
+                localStorage.setItem('isLogged', 'true');
+                document.getElementById('login-error').style.display = 'none';
+                verificarLogin();
+            } else {
+                document.getElementById('login-error').style.display = 'block';
+            }
+        }
+
+        window.fazerLogout = function() {
+            localStorage.removeItem('isLogged');
+            document.getElementById('login-user').value = '';
+            document.getElementById('login-pass').value = '';
+            verificarLogin();
+        }
+
+        // Check on load
+        verificarLogin();
+
     </script>
 </body>
 </html>
